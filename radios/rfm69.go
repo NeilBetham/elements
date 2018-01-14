@@ -10,8 +10,8 @@ import (
 )
 
 const(
-  OpModeReg = 0x01
-  DataModulationReg = 0x02
+  opModeReg = 0x01
+  dataModulationReg = 0x02
   bitRateMsbReg = 0x03
   bitRateLsbReg = 0x04
   freqDevMsbReg = 0x05
