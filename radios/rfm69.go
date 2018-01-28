@@ -4,8 +4,11 @@ import (
   "log"
   "reflect"
   "sort"
+  "time"
   "periph.io/x/periph/conn/spi"
   "periph.io/x/periph/conn/spi/spireg"
+  "periph.io/x/periph/conn/gpio"
+  "periph.io/x/periph/conn/gpio/gpioreg"
 )
 
 var regAddrs = map[string]uint8{
@@ -18,9 +21,14 @@ var regAddrs = map[string]uint8{
   "carrierFreqMsb": 0x07,
   "carrierFreqMid": 0x08,
   "carrierFreqLsb": 0x09,
+  "lnaConfig": 0x18,
   "rxBwFiltCont": 0x19,
   "afcBwFiltCont": 0x1a,
   "afcFeiContStat": 0x1e,
+  "afcValMsb": 0x1f,
+  "afcValLsb": 0x20,
+  "feiValMsb": 0x21,
+  "feiValLsb": 0x22,
   "rssiConf": 0x23,
   "rssiValue": 0x24,
   "dioMapping": 0x25,
@@ -49,6 +57,7 @@ type rfm69Regs struct {
   carrierFreqMsb uint8
   carrierFreqMid uint8
   carrierFreqLsb uint8
+  lnaConfig uint8
   rxBwFiltCont uint8
   afcBwFiltCont uint8
   afcFeiContStat uint8
@@ -69,7 +78,7 @@ type rfm69Regs struct {
 
 
 func newRFM69Regs() (r rfm69Regs){
-  r.opMode = (1 << 2) // Standby mode default
+  r.opMode = (0x01 << 2) // Standby mode default
   r.dataModulation = (2 << 0) // Gaussian filter, BT= 0.5
 
   // 19200 bit rate
@@ -78,7 +87,11 @@ func newRFM69Regs() (r rfm69Regs){
 
   // 9.9 kHz RX freq deviation
   r.freqDevMsb = 0x00
-  r.freqDevLsb = 0xa1
+  r.freqDevLsb = 0x9c
+
+  // Low Noise Amp Config
+  // Auto select gain dna 50 impedance input
+  r.lnaConfig = 0
 
   // RX Bandwidth
   // DCC Freq = 2, RX BW Mant = 20, RX BW Mant = 4
@@ -101,7 +114,7 @@ func newRFM69Regs() (r rfm69Regs){
   r.irqFlags2 = (1 << 4)
 
   // RSSI Threshold
-  r.rssiThresh = 228
+  r.rssiThresh = 170
 
   // Preambles
   r.preambleMsb = 0
@@ -133,12 +146,14 @@ type RFM69 struct {
   freq  int32
   conn spi.Conn
   config rfm69Regs
+  resetPin gpio.PinIO
+  interruptPin gpio.PinIO
 
   recvBytes []byte
 }
 
 // NewRFM69 sets up a new RFM69 class
-func NewRFM69(port string) (r RFM69, err error) {
+func NewRFM69(port string, resetPin string, interruptPin string) (r RFM69, err error) {
   p, openErr := spireg.Open(port)
   if openErr != nil {
     log.Printf("error: open spi port failed")
@@ -150,6 +165,11 @@ func NewRFM69(port string) (r RFM69, err error) {
   r.freq = 915000000
   r.recvBytes = make([]byte, 1)
   r.config = newRFM69Regs()
+  r.resetPin = gpioreg.ByName(resetPin)
+  r.interruptPin = gpioreg.ByName(interruptPin)
+  r.interruptPin.In(gpio.PullDown, gpio.RisingEdge)
+
+  r.Reset()
 
   err = r.init()
   return
@@ -157,6 +177,7 @@ func NewRFM69(port string) (r RFM69, err error) {
 
 // SetFreq Sets the carrier freq of the RFM69
 func (r *RFM69) SetFreq(freq uint32) (err error){
+  r.setStdbyMode()
   r.config.carrierFreqLsb = uint8(freq / 61)
   r.config.carrierFreqMid = uint8((freq / 61) >> 8)
   r.config.carrierFreqMsb = uint8((freq / 61) >> 16)
@@ -164,10 +185,43 @@ func (r *RFM69) SetFreq(freq uint32) (err error){
   return
 }
 
-// StartRead puts the receiver in the RX mode and enables the interrupt
-func (r *RFM69) StartRead() (err error){
-  r.config.opMode = 0x04 // Put the chip into RX mode
-  r.writeReg(regAddrs["opMode"], r.config.opMode)
+func (r *RFM69) setRxMode() (err error){
+  r.config.opMode = (0x04 << 2) // Put the chip into RX mode
+  err = r.writeReg(regAddrs["opMode"], r.config.opMode)
+  return
+}
+
+func (r *RFM69) setStdbyMode() (err error){
+  r.config.opMode = (0x01 << 2) // Put the chip into standby mode
+  err = r.writeReg(regAddrs["opMode"], r.config.opMode)
+  return
+}
+
+func(r *RFM69) readFifo() (data []uint8, err error){
+  // Payload length is 10 bytes which includes sync bytes, without sync bytes
+  // its 8 bytes in total with an extra byte at the front for the FIFO addr
+  bytesToSend := make([]byte, r.config.payloadLength - 1)
+  bytesReceived := make([]byte, len(bytesToSend))
+
+  if err = r.conn.Tx(bytesToSend, bytesReceived); err != nil{
+    return
+  }
+
+  data = bytesReceived[1:]
+  return
+}
+
+// ReceiveData Waits for a payload to be ready in the
+func (r *RFM69) ReceiveData(timeout time.Duration) (data []uint8, rssi float64, err error){
+  r.setRxMode()
+  intRecv := r.interruptPin.WaitForEdge(timeout)
+  rssi, err = r.ReadRSSI(false)
+  r.setStdbyMode()
+  if !intRecv {
+    return
+  }
+
+  data, err = r.readFifo()
   return
 }
 
@@ -179,7 +233,7 @@ func (r *RFM69) DumpRegs() (err error){
   }
 
   var keys []int
-  for addr, _ := range reverseMap {
+  for addr := range reverseMap {
      keys = append(keys, int(addr))
   }
   sort.Ints(keys)
@@ -235,8 +289,29 @@ func (r *RFM69) readReg(addr uint8) (b byte, err error){
   return bytesReceived[1], nil
 }
 
-// StartRSSI starts an RSSI reading
-func (r *RFM69) StartRSSI() (err error){
-  err = r.writeReg(regAddrs["rssiConf"], 0x01)
+// GetRSSI starts an RSSI reading
+func (r *RFM69) ReadRSSI(manualStart bool) (rssiVal float64, err error){
+  if manualStart{
+    err = r.writeReg(regAddrs["rssiConf"], 0x01)
+
+    rssiConfReg, _ := r.readReg(regAddrs["rssiConf"])
+    for (rssiConfReg & 0x02) == 0 {
+      rssiConfReg, err = r.readReg(regAddrs["rssiConf"])
+      if err != nil {
+        return
+      }
+    }
+  }
+
+  rssi, err := r.readReg(regAddrs["rssiValue"])
+  rssiVal = (float64(rssi) / 2.0) * -1
   return
+}
+
+// Reset resets the RFM69 module
+func (r *RFM69) Reset(){
+  r.resetPin.Out(gpio.High)
+  time.Sleep(5 * time.Millisecond)
+  r.resetPin.Out(gpio.Low)
+  time.Sleep(50 * time.Millisecond)
 }

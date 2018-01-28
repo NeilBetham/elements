@@ -5,9 +5,9 @@ import (
   "time"
   "log"
   "periph.io/x/periph/host"
-  "periph.io/x/periph/conn/gpio"
-  "periph.io/x/periph/conn/gpio/gpioreg"
+
   "github.com/NeilBetham/elements/radios"
+  "github.com/NeilBetham/elements/protocol"
 )
 
 func main() {
@@ -15,23 +15,22 @@ func main() {
 		os.Exit(1)
 	}
 
-  resetPin := gpioreg.ByName("GPIO4")
+  r, _ := radios.NewRFM69("/dev/spidev0.0", "GPIO4", "GPIO5")
 
-  resetPin.Out(gpio.High)
-  time.Sleep(5 * time.Millisecond)
-  resetPin.Out(gpio.Low)
-  time.Sleep(50 * time.Millisecond)
+  timeout := 2562500 * time.Microsecond
 
-  r, _ := radios.NewRFM69("/dev/spidev0.0")
+  log.Printf("Waiting for packets...")
 
-  r.SetFreq(902355835)
-  r.StartRead()
+  ph := protocol.NewProtocolHandler(0)
+  r.SetFreq(uint32(ph.NextHop()))
 
-  for{
-    time.Sleep(3 * time.Second)
-    log.Printf("Dumping Registers...")
-    r.DumpRegs()
-    r.StartRSSI()
+  for {
+    data, rssi, _ := r.ReceiveData(timeout)
+    log.Printf("Recevied packet - RSSI: %3.1f,  Data:[% x]", rssi, data)
+    shouldHop := ph.HandlePacket(data)
+    if shouldHop {
+      r.SetFreq(uint32(ph.NextHop()))
+    }
   }
 
   os.Exit(0)
