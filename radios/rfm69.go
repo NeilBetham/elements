@@ -114,7 +114,7 @@ func newRFM69Regs() (r rfm69Regs){
   r.irqFlags2 = (1 << 4)
 
   // RSSI Threshold
-  r.rssiThresh = 170
+  r.rssiThresh = 150
 
   // Preambles
   r.preambleMsb = 0
@@ -177,7 +177,6 @@ func NewRFM69(port string, resetPin string, interruptPin string) (r RFM69, err e
 
 // SetFreq Sets the carrier freq of the RFM69
 func (r *RFM69) SetFreq(freq uint32) (err error){
-  r.setStdbyMode()
   r.config.carrierFreqLsb = uint8(freq / 61)
   r.config.carrierFreqMid = uint8((freq / 61) >> 8)
   r.config.carrierFreqMsb = uint8((freq / 61) >> 16)
@@ -198,8 +197,6 @@ func (r *RFM69) setStdbyMode() (err error){
 }
 
 func(r *RFM69) readFifo() (data []uint8, err error){
-  // Payload length is 10 bytes which includes sync bytes, without sync bytes
-  // its 8 bytes in total with an extra byte at the front for the FIFO addr
   bytesToSend := make([]byte, r.config.payloadLength - 1)
   bytesReceived := make([]byte, len(bytesToSend))
 
@@ -212,16 +209,25 @@ func(r *RFM69) readFifo() (data []uint8, err error){
 }
 
 // ReceiveData Waits for a payload to be ready in the
-func (r *RFM69) ReceiveData(timeout time.Duration) (data []uint8, rssi float64, err error){
+func (r *RFM69) ReceiveData(timeout time.Duration) (pkt Packet, timedout bool, err error){
   r.setRxMode()
   intRecv := r.interruptPin.WaitForEdge(timeout)
-  rssi, err = r.ReadRSSI(false)
+  rssi, _ := r.ReadRSSI(false)
+  freqErr, _ := r.ReadFreqErr()
   r.setStdbyMode()
-  if !intRecv {
+  if intRecv {
+    timedout = false
+  } else {
+    timedout = true
     return
   }
 
-  data, err = r.readFifo()
+  data, _ := r.readFifo()
+
+  pkt.Data = data
+  pkt.Freq = int(uint(r.config.carrierFreqLsb) | (uint(r.config.carrierFreqMid) << 8) | (uint(r.config.carrierFreqMsb) << 16)) * 61
+  pkt.FreqErr = freqErr
+  pkt.Rssi = rssi
   return
 }
 
@@ -289,7 +295,7 @@ func (r *RFM69) readReg(addr uint8) (b byte, err error){
   return bytesReceived[1], nil
 }
 
-// GetRSSI starts an RSSI reading
+// ReadRSSI starts an RSSI reading
 func (r *RFM69) ReadRSSI(manualStart bool) (rssiVal float64, err error){
   if manualStart{
     err = r.writeReg(regAddrs["rssiConf"], 0x01)
@@ -305,6 +311,14 @@ func (r *RFM69) ReadRSSI(manualStart bool) (rssiVal float64, err error){
 
   rssi, err := r.readReg(regAddrs["rssiValue"])
   rssiVal = (float64(rssi) / 2.0) * -1
+  return
+}
+
+// ReadFreqErr reads the current frequency correction
+func (r *RFM69) ReadFreqErr() (freqErr int, err error){
+  feiMsb, _ := r.readReg(regAddrs["feiValMsb"])
+  feiLsb, _ := r.readReg(regAddrs["feiValLsb"])
+  freqErr = int((int16(feiMsb) << 8) | int16(feiLsb)) * 61
   return
 }
 

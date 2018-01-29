@@ -4,6 +4,7 @@ import (
   "log"
   "time"
   "github.com/NeilBetham/elements/crc"
+  "github.com/NeilBetham/elements/radios"
 )
 
 // ProtocolHandler handles receipt of packets and channel hopping
@@ -29,20 +30,21 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   ph.hopIndex = 0
 
   ph.channels = []int{
-    901862125, 902364460, 902865026, 903367422, 903868415, 904369408, 904870462,
-    905372797, 905873790, 906375698, 906876752, 907378172, 907879653, 908381134,
-    908883042, 909384950, 909885516, 910387424, 910888844, 911389898, 911891806,
-    912393226, 912894280, 913396188, 913897608, 914399577, 914900570, 915401563,
-    915903959, 916405379, 916905945, 917406938, 917909334, 918410815, 918911808,
-    919413716, 919915197, 920416617, 920917610, 921418664, 921920572, 922421565,
-    922924388, 923424954, 923926435, 924427428, 924929336, 925431244, 925932725,
-    926433718, 926935626,
+    902355835, 902857585, 903359336, 903861086, 904362837, 904864587,
+    905366338, 905868088, 906369839, 906871589, 907373340, 907875090,
+    908376841, 908878591, 909380342, 909882092, 910383843, 910885593,
+    911387344, 911889094, 912390845, 912892595, 913394346, 913896096,
+    914397847, 914899597, 915401347, 915903098, 916404848, 916906599,
+    917408349, 917910100, 918411850, 918913601, 919415351, 919917102,
+    920418852, 920920603, 921422353, 921924104, 922425854, 922927605,
+    923429355, 923931106, 924432856, 924934607, 925436357, 925938108,
+    926439858, 926941609, 927443359,
   }
 
   ph.hopPattern = []int{
-    1, 30, 21, 11, 41, 15, 46, 26, 5, 34, 18, 48, 38, 8, 24, 44, 14, 31, 0, 2, 39,
-    20, 10, 49, 27, 4, 33, 16, 43, 12, 22, 35, 7, 40, 28, 45, 9, 37, 17, 32, 47, 3,
-    23, 42, 13, 29, 50, 6, 25, 19, 36,
+    50, 18, 40, 24, 7, 46, 31, 12, 35, 21, 2, 28, 43, 15, 4, 26, 37, 9,
+    48, 20, 1, 29, 41, 13, 47, 6, 23, 33, 44, 0, 16, 38, 25, 8, 30, 49,
+    36, 11, 19, 32, 3, 42, 27, 14, 34, 5, 39, 10, 22, 45, 17,
   }
 
   ph.goodPkts = 0
@@ -52,15 +54,19 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
 }
 
 // HandlePacket handles incomming packets and decides if a hop should happen
-func (ph *ProtocolHandler) HandlePacket(pkt []byte) (hop bool){
+func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timeout bool) (hop bool){
   // Davis ISS transmits LSB first
-  for index, data := range pkt {
-    pkt[index] = swapBitOrder(data)
+  for index, data := range pkt.Data {
+    pkt.Data[index] = swapBitOrder(data)
   }
 
   // If the checksum is valid then hop
-  if len(pkt) == 0 || ph.Checksum(pkt) != 0 {
-    log.Printf("Bad packet")
+  if ph.Checksum(pkt.Data) != 0 {
+    log.Printf("Bad Packet Recevied - Freq %d, RSSI: %3.1f, FreqErr: %d, Data: [% x]", pkt.Freq, pkt.Rssi, pkt.FreqErr, pkt.Data)
+    if !ph.resync {
+      ph.badPkts++
+    }
+  } else if timeout {
     if !ph.resync {
       ph.badPkts++
     }
@@ -68,6 +74,10 @@ func (ph *ProtocolHandler) HandlePacket(pkt []byte) (hop bool){
     if ph.resync {
       ph.resync = false
     }
+
+    log.Printf("Packet Recevied - Freq %d, RSSI: %3.1f, FreqErr: %d, Data: [% x]", pkt.Freq, pkt.Rssi, pkt.FreqErr, pkt.Data)
+
+    ph.badPkts = 0
     ph.goodPkts++
   }
 
@@ -94,6 +104,18 @@ func (ph *ProtocolHandler) NextHop() (freq int){
     ph.hopIndex = 0
   }
   return
+}
+
+// CurrentChannel returns the current channel
+func (ph *ProtocolHandler) CurrentChannel() (freq int){
+  hopIndex := ph.hopIndex
+  if hopIndex == 0 {
+    hopIndex = 50
+  } else {
+    hopIndex--
+  }
+
+  return ph.channels[ph.hopPattern[hopIndex]]
 }
 
 func swapBitOrder(b byte) byte {

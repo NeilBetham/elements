@@ -22,14 +22,19 @@ func main() {
   log.Printf("Waiting for packets...")
 
   ph := protocol.NewProtocolHandler(0)
-  r.SetFreq(uint32(ph.NextHop()))
+  ph.NextHop()
+  nextHop := ph.NextHop()
+  log.Printf("Hopping to %v", nextHop)
+  r.SetFreq(uint32(nextHop))
 
   for {
-    data, rssi, _ := r.ReceiveData(timeout)
-    log.Printf("Recevied packet - RSSI: %3.1f,  Data:[% x]", rssi, data)
-    shouldHop := ph.HandlePacket(data)
+    packet, timeout, _ := r.ReceiveData(timeout)
+    shouldHop := ph.HandlePacket(packet, timeout)
+
     if shouldHop {
-      r.SetFreq(uint32(ph.NextHop()))
+      nextHop := ph.NextHop()
+      log.Printf("Hopping to %v", nextHop)
+      r.SetFreq(uint32(nextHop))
     }
   }
 
