@@ -24,8 +24,8 @@ func main() {
   ph := protocol.NewProtocolHandler(0)
   ph.NextHop()
   nextHop := ph.NextHop()
-  log.Printf("Hopping to %v", nextHop)
-  r.SetFreq(uint32(nextHop))
+  log.Printf("Hopping to %v", nextHop.Freq)
+  r.SetFreq(uint32(nextHop.Freq))
 
   for {
     packet, timeout, _ := r.ReceiveData(timeout)
@@ -33,8 +33,8 @@ func main() {
 
     if shouldHop {
       nextHop := ph.NextHop()
-      log.Printf("Hopping to %v", nextHop)
-      r.SetFreq(uint32(nextHop))
+      log.Printf("Hopping to %v", nextHop.Freq)
+      r.SetFreq(uint32(nextHop.Freq))
     }
   }
 

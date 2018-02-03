@@ -3,13 +3,14 @@ package protocol
 import (
   "log"
   "time"
+  "fmt"
   "github.com/NeilBetham/elements/crc"
   "github.com/NeilBetham/elements/radios"
 )
 
 
 type Hop struct {
-  Freq uint
+  Freq int
   Dwell time.Duration
   HopIndex int
 }
@@ -19,7 +20,7 @@ func (h Hop)String() string {
     "Freq: %d, Hop: %2d, Dwell: %3.2f",
     h.Freq,
     h.HopIndex,
-    h.Dwell
+    h.Dwell,
   )
 }
 
@@ -77,10 +78,10 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
 func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool){
   if ph.Checksum(pkt.Data) != 0 || timedout {
     ph.invalidPkt()
-    if !timedout && time.Now() < (ph.lastPktReceived + ph.hopTime - (10 * time.Millisecond)) {
+    if !timedout && (time.Now().UnixNano() < (ph.lastPktReceived.Add(ph.hopTime).Add(-10 * time.Millisecond)).UnixNano()) {
       return false
     }
-  } else if pk.Data[1] != ph.stationID  {
+  } else if int(pkt.Data[1] & 0x0f) != ph.stationID  {
     return false
   } else {
     for index, data := range pkt.Data {
@@ -120,8 +121,8 @@ func (ph *ProtocolHandler) validPkt(pkt radios.Packet) {
 
 func (ph *ProtocolHandler) NextHop() (hop Hop){
   hop.Freq = ph.channels[ph.hopPattern[ph.hopIndex]]
-  hop.HopIndex = ph.HopIndex
-  hop.DwellTime = ph.hopTime
+  hop.HopIndex = ph.hopIndex
+  hop.Dwell = ph.hopTime
 
   ph.hopIndex++
   if ph.hopIndex > 50 {

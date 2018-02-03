@@ -2,7 +2,7 @@ package protocol
 
 import (
   "log"
-  "time"
+  "fmt"
   "github.com/NeilBetham/elements/radios"
 )
 
@@ -21,14 +21,14 @@ func (r Reading) String() string {
     "Reading for %s, station: %d, value %f",
     r.SensorName,
     r.StationID,
-    r.Value
+    r.Value,
   )
 }
 
 func ParsePacket(pkt radios.Packet) (rd Reading){
-  rd.StationID = (pkt.Data[0] & 0x0f) + 1
-  rd.Sensor = (pkt.Data[0] & 0xf0) >> 4
-  rd.SensorName = fmt.Printf("%s", rd.Sensor)
+  rd.StationID = int((pkt.Data[0] & 0x0f) + 1)
+  rd.Sensor = Sensor((pkt.Data[0] & 0xf0) >> 4)
+  rd.SensorName = fmt.Sprintf("%s", rd.Sensor)
 
   switch rd.Sensor {
   case SuperCapVoltage:
@@ -50,11 +50,12 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
   case RainClicks:
     rd.Value = convertRainClicks(pkt.Data[3:6])
   default:
-    return fmt.Sprintf("Uknown Reading Type: %0x", rType)
+    fmt.Sprintf("Unknown Reading Type: %0x", rd.Sensor)
   }
 
   rd.WindSpeed = float64(pkt.Data[1])
   rd.WindDir = float64(9 + ((float64(pkt.Data[2]) * 342) / 255))
+  return
 }
 
 func convertSuperCapVoltage(data []byte) float64 {
@@ -65,16 +66,16 @@ func convertRainRate(data []byte) float64 {
   if data[0] == 0xff{
     return 0
   } else if data[1] & 0x40 == 0 {
-    return float64(((uint(data[1]) & 0x30) / 16 * 250) + data[0])
+    return ((float64(uint(data[1]) & 0x30) / 16 * 250) + float64(data[0]))
   } else if data[1] & 0x40 == 0x40 {
-    return float64(((uint(data[1]) & 0x30) / 16 * 250) + data[0]) / 16
+    return ((float64(uint(data[1]) & 0x30) / 16 * 250) + float64(data[0])) / 16
   }
   log.Printf("Unkown Rain Rate State")
   return 0
 }
 
 func convertLight(data []byte) float64 {
-  return float64(uint(data[0]) * 4) + ((uint(byte[1]) & 0xc0) / 64)
+  return float64(uint(data[0]) * 4) + (float64(uint(data[1]) & 0xc0) / 64)
 }
 
 func convertTemperature(data []byte) float64 {
@@ -96,19 +97,19 @@ func convertRainClicks(data []byte) float64 {
 type Sensor byte
 
 const (
-  SuperCapVoltage Reading = 2
-  UVIndex         Reading = 4
-  RainRate        Reading = 5
-  SolarRadiation  Reading = 6
-  Light           Reading = 7
-  Temperature     Reading = 8
-  WindGustSpeed   Reading = 9
-  Humidity        Reading = 0xA
-  RainClicks      Reading = 0xE
+  SuperCapVoltage Sensor = 2
+  UVIndex         Sensor = 4
+  RainRate        Sensor = 5
+  SolarRadiation  Sensor = 6
+  Light           Sensor = 7
+  Temperature     Sensor = 8
+  WindGustSpeed   Sensor = 9
+  Humidity        Sensor = 0xA
+  RainClicks      Sensor = 0xE
 )
 
-func (r Sensor) String(rType byte) string {
-  switch rType {
+func (r Sensor) String(sType Sensor) string {
+  switch sType {
   case SuperCapVoltage:
     return "SuperCapVoltage"
   case UVIndex:
@@ -128,6 +129,6 @@ func (r Sensor) String(rType byte) string {
   case RainClicks:
     return "RainClicks"
   default:
-    return fmt.Sprintf("Uknown Reading Type: %0x", rType)
+    return fmt.Sprintf("Uknown Reading Type: %0x", sType)
   }
 }
