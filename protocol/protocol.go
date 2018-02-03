@@ -76,6 +76,10 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
 }
 
 func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool, rd Reading){
+  for index, data := range pkt.Data {
+    pkt.Data[index] = swapBitOrder(data)
+  }
+
   if ph.Checksum(pkt.Data) != 0 || timedout {
     if !timedout{
       log.Printf("Bad: %s", pkt)
@@ -91,9 +95,6 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
     return
   } else {
     log.Printf("%s", pkt)
-    for index, data := range pkt.Data {
-      pkt.Data[index] = swapBitOrder(data)
-    }
 
     ph.validPkt(pkt)
     rd = ParsePacket(pkt)
