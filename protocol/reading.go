@@ -19,7 +19,7 @@ type Reading struct {
 
 func (r Reading) String() string {
   return fmt.Sprintf(
-    "Reading for %s, station: %d, wind speed %d, wind direction %d, value %f",
+    "Reading for %s, station: %d, wind speed %2.0f, wind direction %3.0f, value %f",
     r.SensorName,
     r.StationID,
     r.WindSpeed,
