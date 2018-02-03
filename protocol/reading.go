@@ -130,6 +130,6 @@ func (r Sensor) String() string {
   case RainClicks:
     return "RainClicks"
   default:
-    return fmt.Sprintf("Uknown Reading Type: %0x", r)
+    return fmt.Sprintf("Uknown Reading Type: %0x", uint(r))
   }
 }
