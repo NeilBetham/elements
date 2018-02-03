@@ -125,6 +125,7 @@ func (ph *ProtocolHandler) validPkt(pkt radios.Packet) {
     ph.resync = false
   }
 
+  ph.badPkts = 0
   ph.goodPkts++
   ph.lastPktReceived = time.Now()
 }
