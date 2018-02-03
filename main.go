@@ -29,7 +29,11 @@ func main() {
 
   for {
     packet, timeout, _ := r.ReceiveData(timeout)
-    shouldHop := ph.HandlePacket(packet, timeout)
+    shouldHop, reading := ph.HandlePacket(packet, timeout)
+
+    if reading != nil {
+      log.Printf("Reading: %s", rd)
+    }
 
     if shouldHop {
       nextHop := ph.NextHop()

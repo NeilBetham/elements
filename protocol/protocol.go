@@ -75,7 +75,7 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   return
 }
 
-func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool){
+func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool, rd Reading){
   if ph.Checksum(pkt.Data) != 0 || timedout {
     ph.invalidPkt()
     if !timedout && (time.Now().UnixNano() < (ph.lastPktReceived.Add(ph.hopTime).Add(-10 * time.Millisecond)).UnixNano()) {
@@ -89,8 +89,7 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
     }
 
     ph.validPkt(pkt)
-    reading := ParsePacket(pkt)
-    log.Printf("Valid Packet: %s", reading)
+    rd = ParsePacket(pkt)
     return true
   }
 
