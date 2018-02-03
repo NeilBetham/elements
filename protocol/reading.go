@@ -109,8 +109,8 @@ const (
   RainClicks      Sensor = 0xE
 )
 
-func (r Sensor) String(sType Sensor) string {
-  switch sType {
+func (r Sensor) String() string {
+  switch r {
   case SuperCapVoltage:
     return "SuperCapVoltage"
   case UVIndex:
@@ -130,6 +130,6 @@ func (r Sensor) String(sType Sensor) string {
   case RainClicks:
     return "RainClicks"
   default:
-    return fmt.Sprintf("Uknown Reading Type: %0x", sType)
+    return fmt.Sprintf("Uknown Reading Type: %0x", r)
   }
 }

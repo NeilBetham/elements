@@ -89,7 +89,7 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
       hop = false
       return
     }
-  } else if int(pkt.Data[1] & 0x0f) != ph.stationID  {
+  } else if int(pkt.Data[0] & 0x0f) != ph.stationID  {
     log.Printf("Wrong Station: %s", pkt)
     hop = false
     return
