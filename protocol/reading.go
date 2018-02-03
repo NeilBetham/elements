@@ -19,9 +19,11 @@ type Reading struct {
 
 func (r Reading) String() string {
   return fmt.Sprintf(
-    "Reading for %s, station: %d, value %f",
+    "Reading for %s, station: %d, wind speed %d, wind direction %d, value %f",
     r.SensorName,
     r.StationID,
+    r.WindSpeed,
+    r.WindDir,
     r.Value,
   )
 }
@@ -130,6 +132,6 @@ func (r Sensor) String() string {
   case RainClicks:
     return "RainClicks"
   default:
-    return fmt.Sprintf("Uknown Reading Type: %0x", uint(r))
+    return fmt.Sprintf("Unknown Reading Type: %0x", uint(r))
   }
 }
