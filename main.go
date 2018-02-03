@@ -21,7 +21,7 @@ func main() {
 
   log.Printf("Waiting for packets...")
 
-  ph := protocol.NewProtocolHandler(0)
+  ph := protocol.NewProtocolHandler(1)
   ph.NextHop()
   nextHop := ph.NextHop()
   log.Printf("Hopping to %v", nextHop.Freq)
