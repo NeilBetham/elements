@@ -79,10 +79,12 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
   if ph.Checksum(pkt.Data) != 0 || timedout {
     ph.invalidPkt()
     if !timedout && (time.Now().UnixNano() < (ph.lastPktReceived.Add(ph.hopTime).Add(-10 * time.Millisecond)).UnixNano()) {
-      return false
+      hop = false
+      return
     }
   } else if int(pkt.Data[1] & 0x0f) != ph.stationID  {
-    return false
+    hop = false
+    return
   } else {
     for index, data := range pkt.Data {
       pkt.Data[index] = swapBitOrder(data)
@@ -90,14 +92,16 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
 
     ph.validPkt(pkt)
     rd = ParsePacket(pkt)
-    return true
+    hop = true
+    return
   }
 
   if ph.resync {
-    return false
+    hop = false
   } else {
-    return true
+    hop = true
   }
+  return
 }
 
 func (ph *ProtocolHandler) invalidPkt(){
