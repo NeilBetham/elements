@@ -7,21 +7,6 @@ import (
   "github.com/NeilBetham/elements/radios"
 )
 
-// ProtocolHandler handles receipt of packets and channel hopping
-type ProtocolHandler struct {
-  crc.CRC
-
-  hopTime time.Duration
-  hopIndex int
-  hopPattern []int
-  channels []int
-
-  goodPkts int
-  badPkts int
-  resync bool
-
-  lastPktReceived time.Time
-}
 
 type Hop struct {
   Freq uint
@@ -38,9 +23,26 @@ func (h Hop)String() string {
   )
 }
 
-// NewProtocolHandler sets up a new protocol handler
+
+type ProtocolHandler struct {
+  crc.CRC
+  stationID int
+
+  hopTime time.Duration
+  hopIndex int
+  hopPattern []int
+  channels []int
+
+  goodPkts int
+  badPkts int
+  resync bool
+
+  lastPktReceived time.Time
+}
+
 func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   ph.CRC = crc.NewCRC("CCITT-16", 0, 0x1021, 0)
+  ph.stationID = stationNumber - 1
 
   ph.hopTime = time.Duration(2562500 + (stationNumber * 62500)) * time.Microsecond
 
@@ -72,57 +74,55 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   return
 }
 
-// HandlePacket handles incomming packets and decides if a hop should happen
-func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timeout bool) (hop bool){
-  // Davis ISS transmits LSB first
-  for index, data := range pkt.Data {
-    pkt.Data[index] = swapBitOrder(data)
-  }
-
-  // If the checksum is valid then hop
-  if ph.Checksum(pkt.Data) != 0 {
-    log.Printf("Bad Packet Recevied - Freq %d, RSSI: %3.1f, FreqErr: %d, Data: [% x]", pkt.Freq, pkt.Rssi, pkt.FreqErr, pkt.Data)
-    if time.Now().Sub(ph.lastPktReceived) < (2562500 * time.Microsecond) {
+func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool){
+  if ph.Checksum(pkt.Data) != 0 || timedout {
+    ph.invalidPkt()
+    if !timedout && time.Now() < (ph.lastPktReceived + ph.hopTime - (10 * time.Millisecond)) {
       return false
     }
-
-    if !ph.resync {
-      ph.badPkts++
-    }
-  } else if timeout {
-    if !ph.resync {
-      ph.badPkts++
-    }
+  } else if pk.Data[1] != ph.stationID  {
+    return false
   } else {
-    if ph.resync {
-      ph.resync = false
+    for index, data := range pkt.Data {
+      pkt.Data[index] = swapBitOrder(data)
     }
 
-    log.Printf("Packet Recevied - Freq %d, RSSI: %3.1f, FreqErr: %d, Data: [% x]", pkt.Freq, pkt.Rssi, pkt.FreqErr, pkt.Data)
-
-    ph.badPkts = 0
-    ph.goodPkts++
-    ph.lastPktReceived = time.Now()
-  }
-
-  // If we start to accumulate bad packets it's time for a resync
-  if ph.badPkts >= 5 {
-    log.Printf("Resync needed")
-    ph.resync = true
-    ph.badPkts = 0
+    ph.validPkt(pkt)
+    reading := ParsePacket(pkt)
+    log.Printf("Valid Packet: %s", reading)
+    return true
   }
 
   if ph.resync {
-    hop = false
+    return false
   } else {
-    hop = true
+    return true
   }
-  return
 }
 
-// NextHop gets the next hopping frequency and increments the hop index
-func (ph *ProtocolHandler) NextHop() (freq int){
-  freq = ph.channels[ph.hopPattern[ph.hopIndex]]
+func (ph *ProtocolHandler) invalidPkt(){
+  ph.badPkts++
+  if ph.badPkts > 5 && !ph.resync {
+    log.Printf("Out of sync with transmitter, resyncing...")
+    ph.resync = true
+    ph.badPkts = 0
+  }
+}
+
+func (ph *ProtocolHandler) validPkt(pkt radios.Packet) {
+  if ph.resync {
+    ph.resync = false
+  }
+
+  ph.goodPkts++
+  ph.lastPktReceived = time.Now()
+}
+
+func (ph *ProtocolHandler) NextHop() (hop Hop){
+  hop.Freq = ph.channels[ph.hopPattern[ph.hopIndex]]
+  hop.HopIndex = ph.HopIndex
+  hop.DwellTime = ph.hopTime
+
   ph.hopIndex++
   if ph.hopIndex > 50 {
     ph.hopIndex = 0
@@ -130,7 +130,6 @@ func (ph *ProtocolHandler) NextHop() (freq int){
   return
 }
 
-// CurrentChannel returns the current channel
 func (ph *ProtocolHandler) CurrentChannel() (freq int){
   hopIndex := ph.hopIndex
   if hopIndex == 0 {
