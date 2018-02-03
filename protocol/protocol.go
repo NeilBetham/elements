@@ -19,6 +19,23 @@ type ProtocolHandler struct {
   goodPkts int
   badPkts int
   resync bool
+
+  lastPktReceived time.Time
+}
+
+type Hop struct {
+  Freq uint
+  Dwell time.Duration
+  HopIndex int
+}
+
+func (h Hop)String() string {
+  return fmt.Sprintf(
+    "Freq: %d, Hop: %2d, Dwell: %3.2f",
+    h.Freq,
+    h.HopIndex,
+    h.Dwell
+  )
 }
 
 // NewProtocolHandler sets up a new protocol handler
@@ -50,6 +67,8 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   ph.goodPkts = 0
   ph.badPkts = 0
   ph.resync = true
+
+  ph.lastPktReceived = time.Now()
   return
 }
 
@@ -63,6 +82,10 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timeout bool) (hop bo
   // If the checksum is valid then hop
   if ph.Checksum(pkt.Data) != 0 {
     log.Printf("Bad Packet Recevied - Freq %d, RSSI: %3.1f, FreqErr: %d, Data: [% x]", pkt.Freq, pkt.Rssi, pkt.FreqErr, pkt.Data)
+    if time.Now().Sub(ph.lastPktReceived) < (2562500 * time.Microsecond) {
+      return false
+    }
+
     if !ph.resync {
       ph.badPkts++
     }
@@ -79,6 +102,7 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timeout bool) (hop bo
 
     ph.badPkts = 0
     ph.goodPkts++
+    ph.lastPktReceived = time.Now()
   }
 
   // If we start to accumulate bad packets it's time for a resync

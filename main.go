@@ -17,7 +17,7 @@ func main() {
 
   r, _ := radios.NewRFM69("/dev/spidev0.0", "GPIO4", "GPIO5")
 
-  timeout := 2562500 * time.Microsecond
+  timeout := (2562500 + 200000) * time.Microsecond
 
   log.Printf("Waiting for packets...")
 
