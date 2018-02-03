@@ -77,15 +77,20 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
 
 func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop bool, rd Reading){
   if ph.Checksum(pkt.Data) != 0 || timedout {
+    if !timedout{
+      log.Printf("Bad: %s", pkt)
+    }
     ph.invalidPkt()
     if !timedout && (time.Now().UnixNano() < (ph.lastPktReceived.Add(ph.hopTime).Add(-10 * time.Millisecond)).UnixNano()) {
       hop = false
       return
     }
   } else if int(pkt.Data[1] & 0x0f) != ph.stationID  {
+    log.Printf("Wrong Station: %s", pkt)
     hop = false
     return
   } else {
+    log.Printf("%s", pkt)
     for index, data := range pkt.Data {
       pkt.Data[index] = swapBitOrder(data)
     }
