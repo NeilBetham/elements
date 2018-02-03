@@ -11,6 +11,7 @@ type Reading struct {
   Sensor Sensor
   SensorName string
   Value float64
+  Valid bool
 
   WindSpeed float64
   WindDir float64

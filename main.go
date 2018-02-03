@@ -31,7 +31,9 @@ func main() {
     packet, timeout, _ := r.ReceiveData(timeout)
     shouldHop, reading := ph.HandlePacket(packet, timeout)
 
-    log.Printf("Reading: %s", reading)
+    if reading.Valid {
+      log.Printf("Reading: %s", reading)
+    }
 
     if shouldHop {
       nextHop := ph.NextHop()

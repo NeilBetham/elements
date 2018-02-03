@@ -92,6 +92,7 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
 
     ph.validPkt(pkt)
     rd = ParsePacket(pkt)
+    rd.Valid = true
     hop = true
     return
   }
