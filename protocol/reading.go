@@ -57,7 +57,7 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
   }
 
   rd.WindSpeed = float64(pkt.Data[1])
-  rd.WindDir = float64(9 + ((float64(pkt.Data[2]) * 360) / 255))
+  rd.WindDir = ((float64(pkt.Data[2]) * 360) / 255)
   return
 }
 
