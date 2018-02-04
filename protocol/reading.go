@@ -15,16 +15,25 @@ type Reading struct {
 
   WindSpeed float64
   WindDir float64
+
+  StationBatLow bool
 }
 
 func (r Reading) String() string {
+  if r.StationBatLow {
+    batLow := "yes"
+  } else {
+    batLow := "no"
+  }
+
   return fmt.Sprintf(
-    "Reading for %s, station: %d, wind speed %2.0f, wind direction %3.0f, value %f",
+    "Reading for %s, station: %d, wind speed %2.0f, wind direction %3.0f, value %f, battery low %s",
     r.SensorName,
     r.StationID,
     r.WindSpeed,
     r.WindDir,
     r.Value,
+    batLow,
   )
 }
 
@@ -32,6 +41,7 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
   rd.StationID = int((pkt.Data[0] & 0x0f) + 1)
   rd.Sensor = Sensor((pkt.Data[0] & 0xf0) >> 4)
   rd.SensorName = fmt.Sprintf("%s", rd.Sensor)
+  rd.StationBatLow = (pkt.Data[0] & 0x08) > 0
 
   switch rd.Sensor {
   case SuperCapVoltage:
