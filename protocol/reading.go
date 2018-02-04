@@ -28,7 +28,7 @@ func (r Reading) String() string {
   }
 
   return fmt.Sprintf(
-    "Reading for %s, station: %d, wind speed %2.0f, wind direction %3.0f, value %f, battery low %s",
+    "Reading for %s, station: %d, wind speed: %2.0f, wind direction: %3.0f, value: %f, battery low: %s",
     r.SensorName,
     r.StationID,
     r.WindSpeed,
@@ -73,7 +73,7 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
 }
 
 func convertSuperCapVoltage(data []byte) float64 {
-  return float64((uint(data[0]) * 4 + ((uint(data[1]) & 0xC0) / 64)) / 100)
+  return (float64(uint(data[0]) << 2) + (float64(uint(data[1]) & 0xc0) / 64)) / 100
 }
 
 func convertRainRate(data []byte) float64 {
