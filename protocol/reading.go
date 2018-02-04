@@ -20,10 +20,11 @@ type Reading struct {
 }
 
 func (r Reading) String() string {
+  batLow := ""
   if r.StationBatLow {
-    batLow := "yes"
+    batLow = "yes"
   } else {
-    batLow := "no"
+    batLow = "no"
   }
 
   return fmt.Sprintf(
