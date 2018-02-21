@@ -39,6 +39,7 @@ type ProtocolHandler struct {
   resync bool
 
   lastPktReceived time.Time
+  lastHop time.Time
 }
 
 func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
@@ -71,7 +72,8 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   ph.badPkts = 0
   ph.resync = true
 
-  ph.lastPktReceived = time.Now().Add(ph.hopTime * time.Duration(len(ph.channels)))
+  ph.lastPktReceived = time.Now()
+  ph.lastHop = time.Now()
   return
 }
 
@@ -104,13 +106,14 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
   }
 
   if ph.resync {
-    if ph.lastPktReceived.Add(ph.hopTime * time.Duration(len(ph.channels))).After(time.Now()) {
-      ph.lastPktReceived = time.Now()
+    if ph.lastHop.Add(ph.hopTime * time.Duration(len(ph.channels))).After(time.Now()) {
+      ph.lastHop = time.Now()
       hop = true
     } else {
       hop = false
     }
   } else {
+    ph.lastHop = time.Now()
     hop = true
   }
   return
