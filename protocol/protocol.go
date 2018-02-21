@@ -71,7 +71,7 @@ func NewProtocolHandler(stationNumber int) (ph ProtocolHandler){
   ph.badPkts = 0
   ph.resync = true
 
-  ph.lastPktReceived = time.Now()
+  ph.lastPktReceived = time.Now().Add(ph.hopTime * time.Duration(len(ph.channels)))
   return
 }
 
