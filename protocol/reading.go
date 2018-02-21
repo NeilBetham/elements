@@ -64,7 +64,8 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
   case RainClicks:
     rd.Value = convertRainClicks(pkt.Data[3:6])
   default:
-    fmt.Sprintf("Unknown Reading Type: %0x", rd.Sensor)
+    fmt.Sprintf("UnknownSensor-%0x", rd.Sensor)
+    rd.Value = int((int(pkt.Data[3]) << 16) | (int(pkt.Data[4]) << 8) | int(pkt.Data[5]))
   }
 
   rd.WindSpeed = float64(pkt.Data[1])
