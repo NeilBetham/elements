@@ -104,7 +104,12 @@ func (ph *ProtocolHandler) HandlePacket(pkt radios.Packet, timedout bool) (hop b
   }
 
   if ph.resync {
-    hop = false
+    if ph.lastPktReceived.Add(ph.hopTime * len(ph.channels)).After(Time.Now()) {
+      ph.lastPktReceived = time.Now()
+      hop = true
+    } else {
+      hop = false
+    }
   } else {
     hop = true
   }
