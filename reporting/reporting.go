@@ -58,13 +58,8 @@ func NewReporter(c config.Config) (r Reporter) {
 }
 
 
-func (rp *Reporter) ReportReading(r protocol.Reading) (err error) {
-  var report Report
-  report.Reading.Type = r.SensorName
-  report.Reading.RawValue = fmt.Sprintf("%X", r.RawValue)
-  report.Reading.DecodedValue = fmt.Sprintf("%f", r.Value)
-  report.Reading.Timestamp = time.Now()
 
+func (rp *Reporter) postReport(report Report) (err error) {
   jsonData, err :=  json.Marshal(report)
   if err != nil {
     return
@@ -81,5 +76,27 @@ func (rp *Reporter) ReportReading(r protocol.Reading) (err error) {
   if resp.StatusCode > 300 {
     err = errors.New(fmt.Sprintf("Error posting to API, http code: %i", resp.StatusCode))
   }
+  return
+}
+
+
+func (rp *Reporter) ReportReading(r protocol.Reading) (err error) {
+  var report Report
+
+  report.Reading.Type = r.SensorName
+  report.Reading.RawValue = fmt.Sprintf("%X", r.RawValue)
+  report.Reading.DecodedValue = fmt.Sprintf("%f", r.Value)
+  report.Reading.Timestamp = time.Now()
+  err = rp.postReport(report)
+
+  report.Reading.Type = "WindSpeed"
+  report.Reading.RawValue = ""
+  report.Reading.DecodedValue = fmt.Sprintf("%f", r.WindSpeed)
+  err = rp.postReport(report)
+
+  report.Reading.Type = "WindDir"
+  report.Reading.DecodedValue = fmt.Sprintf("%f", r.WindDir)
+  err = rp.postReport(report)
+
   return
 }
