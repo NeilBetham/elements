@@ -3,6 +3,7 @@ package protocol
 import (
   "log"
   "fmt"
+  "encoding/binary"
   "github.com/NeilBetham/elements/radios"
 )
 
@@ -11,6 +12,7 @@ type Reading struct {
   Sensor Sensor
   SensorName string
   Value float64
+  RawValue uint32
   Valid bool
 
   WindSpeed float64
@@ -43,6 +45,9 @@ func ParsePacket(pkt radios.Packet) (rd Reading){
   rd.Sensor = Sensor((pkt.Data[0] & 0xf0) >> 4)
   rd.SensorName = fmt.Sprintf("%s", rd.Sensor)
   rd.StationBatLow = (pkt.Data[0] & 0x08) > 0
+
+  rawData := append([]byte { 0x0f }, pkt.Data[3:6]...)
+  rd.RawValue = binary.BigEndian.Uint32(rawData)
 
   switch rd.Sensor {
   case SuperCapVoltage:

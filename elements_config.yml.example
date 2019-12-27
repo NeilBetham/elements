@@ -1,0 +1,7 @@
+server:
+  host: example.com
+  port: 1234
+  ssl: true
+  ssl_verify: false
+credentials:
+  api_key: afdsljhasdfkjhdfsaskljhasdflkjh
