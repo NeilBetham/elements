@@ -13,6 +13,13 @@ import (
   "github.com/NeilBetham/elements/config"
 )
 
+func reportReading(r protocol.Reading, rp reporting.Reporter) {
+  err := rp.ReportReading(r)
+  if err != nil {
+    log.Printf("Error reporting reading: %s", err)
+  }
+}
+
 func main() {
   if _, err := host.Init(); err != nil {
     os.Exit(1)
@@ -52,10 +59,7 @@ func main() {
 
     if reading.Valid {
       log.Printf("Reading: %s", reading)
-      err := reporter.ReportReading(reading)
-      if err != nil {
-        log.Printf("Error reporting reading: %s", err)
-      }
+      go reportReading(reading, reporter)
     }
 
     if shouldHop {

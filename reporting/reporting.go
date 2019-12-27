@@ -29,7 +29,7 @@ type Reporter struct {
 
 
 func NewReporter(c config.Config) (r Reporter) {
-  if c.Server.SslVerify {
+  if c.Server.SslVerify == false {
     tr := &http.Transport {
       TLSClientConfig: &tls.Config { InsecureSkipVerify: true },
     }

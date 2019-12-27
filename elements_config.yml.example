@@ -3,5 +3,6 @@ server:
   port: 1234
   ssl: true
   ssl_verify: false
+  station_id: 1
 credentials:
   api_key: afdsljhasdfkjhdfsaskljhasdflkjh
