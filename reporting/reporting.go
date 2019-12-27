@@ -4,6 +4,7 @@ import (
   "fmt"
   "time"
   "bytes"
+  "errors"
   "net/http"
   "crypto/tls"
   "encoding/json"
@@ -25,6 +26,7 @@ type Report struct {
 type Reporter struct {
   Client *http.Client
   Url string
+  ApiKey string
 }
 
 
@@ -50,6 +52,8 @@ func NewReporter(c config.Config) (r Reporter) {
     c.Server.StationId,
   )
 
+  r.ApiKey = c.Credentials.ApiKey
+
   return
 }
 
@@ -66,6 +70,16 @@ func (rp *Reporter) ReportReading(r protocol.Reading) (err error) {
     return
   }
 
-  _, err = rp.Client.Post(rp.Url, "application/json", bytes.NewBuffer(jsonData))
+  req, err := http.NewRequest("POST", rp.Url, bytes.NewBuffer(jsonData))
+  if err != nil {
+    return
+  }
+  req.Header.Add("Authorization", fmt.Sprintf("Token %s", rp.ApiKey))
+  req.Header.Set("Content-Type", "application/json")
+
+  resp, err := rp.Client.Do(req)
+  if resp.StatusCode > 300 {
+    err = errors.New(fmt.Sprintf("Error posting to API, http code: %i", resp.StatusCode))
+  }
   return
 }
